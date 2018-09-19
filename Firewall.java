@@ -28,6 +28,8 @@ public class Firewall {
         preprocessRules(inputPath);
     }
     
+
+    // Extract data from CSV and convert it to firewall rules
     public void preprocessRules(String inputPath) throws FileNotFoundException, IOException{
         BufferedReader br = new BufferedReader(new FileReader(inputPath));
         String line = "";
@@ -42,23 +44,27 @@ public class Firewall {
         }
     }
 
+
+    // Store the port, protocol information for each direction
     public void createRules(String direction, String protocol, String port, String ipAddress){
-    	Protocol p =null;
-    	if(direction.equals("inbound")){
-    		if(!inboundProtocol.containsKey(protocol)){
-    			inboundProtocol.put(protocol, new Protocol(protocol));
-    		}
-    		p = inboundProtocol.get(protocol);
-    		
-    	}else if(direction.equals("outbound")){
-    		if(!outboundProtocol.containsKey(protocol)){
-    			outboundProtocol.put(protocol, new Protocol(protocol));	
-    		}
-    		p = outboundProtocol.get(protocol);
-    	}
-    	p.insertPorts(port,ipAddress);
+        Protocol p =null;
+        if(direction.equals("inbound")){
+            if(!inboundProtocol.containsKey(protocol)){
+                inboundProtocol.put(protocol, new Protocol(protocol));
+            }
+            p = inboundProtocol.get(protocol);
+            
+        }else if(direction.equals("outbound")){
+            if(!outboundProtocol.containsKey(protocol)){
+                outboundProtocol.put(protocol, new Protocol(protocol)); 
+            }
+            p = outboundProtocol.get(protocol);
+        }
+        p.insertPorts(port,ipAddress);
     }
     
+
+    //Test if packet can be accepted or not
     public boolean accept_packet(String direction, String protocol, int port, String ipAddress){
         Protocol pr = null;
         if(direction.equals("inbound")){
@@ -67,13 +73,13 @@ public class Firewall {
             }else{
                 return false;
             }
-    	}else if(direction.equals("outbound")){
+        }else if(direction.equals("outbound")){
             if(outboundProtocol.containsKey(protocol)){
                  pr = outboundProtocol.get(protocol);
             }else{
                 return false;
             }
-    	}
+        }
         if(pr.ports.containsKey(port)){
             Port po = pr.ports.get(port);
             if(po.ipAddress.contains(ipAddress)){
@@ -103,76 +109,81 @@ public class Firewall {
 }
 
 
+
+// To store tcp,udp protocols and respective allowed port ranges
 class Protocol{
-	String protocol;
-	HashMap<Integer, Port> ports;
+    String protocol;
+    Map<Integer, Port> ports;
 
-	Protocol(String input){
-		protocol = input;
-		ports = new HashMap<>();
-	}
+    Protocol(String input){
+        protocol = input;
+        ports = new HashMap<>();
+    }
 
-	void insertPorts(String portRange, String ipAddress){
-		for(Port p : Port.extractPorts(portRange,this)){
-			ports.put(p.portNumber,p);
+    void insertPorts(String portRange, String ipAddress){
+        for(Port p : Port.extractPorts(portRange,this)){
+            ports.put(p.portNumber,p);
             p.insertIps(ipAddress);
-		}
-	}
+        }
+    }
 
 }
 
+
+
+// To Store port data and allowed ip ranges.
 class Port{
-	 int portNumber;
-	 HashSet<String> ipAddress;
-	 ArrayList<String[]>  ipRanges;
+     int portNumber;
+     Set<String> ipAddress;
+     List<String[]> ipRanges;
 
-	Port(int port){
-		portNumber = port;
-		ipAddress = new HashSet<>();
-		ipRanges = new ArrayList<>();
-	}
+    Port(int port){
+        portNumber = port;
+        ipAddress = new HashSet<>();
+        ipRanges = new ArrayList<>();
+    }
 
+    //Generate all possible port numbers and store them.
+    public static ArrayList<Port> extractPorts(String portRange, Protocol protocol){
+        ArrayList<Port> linkedPorts = new ArrayList<>();
+        if(portRange.indexOf("-")>0){
+            String[] startEnd = portRange.split("-");
+            for(int i = Integer.parseInt(startEnd[0]);i<=Integer.parseInt(startEnd[1]);i++){
+                linkedPorts.add(createPort(i,protocol));
+            }
 
-	public static ArrayList<Port> extractPorts(String portRange, Protocol protocol){
-		ArrayList<Port> linkedPorts = new ArrayList<>();
-		if(portRange.indexOf("-")>0){
-			String[] startEnd = portRange.split("-");
-			for(int i = Integer.parseInt(startEnd[0]);i<=Integer.parseInt(startEnd[1]);i++){
-				linkedPorts.add(createPort(i,protocol));
-			}
+        }else{
+            int port = Integer.parseInt(portRange);
+            linkedPorts.add(createPort(port,protocol));
+        }
+        return linkedPorts;
+    }
 
-		}else{
-			int port = Integer.parseInt(portRange);
-			linkedPorts.add(createPort(port,protocol));
-		}
-		return linkedPorts;
-	}
+    //Store IPRanges -> if range store it in list , if single IP -> store it in HashSet
+    public void insertIps(String ip){
+        if(ip.indexOf("-")>0){
+            String[] startEnd = ip.split("-");
+            ipRanges.add(startEnd);
 
+        }else{
+            ipAddress.add(ip);
+        }
+    }
 
-	public void insertIps(String ip){
-		if(ip.indexOf("-")>0){
-			String[] startEnd = ip.split("-");
-			ipRanges.add(startEnd);
-
-		}else{
-			ipAddress.add(ip);
-		}
-	}
-
-	private static Port createPort(int portNumber,Protocol protocol){
-		if(!protocol.ports.containsKey(portNumber)){
-			Port p = new Port(portNumber);
-			return p;
-		}else{
-			return protocol.ports.get(portNumber);
-		}
-	}
+    private static Port createPort(int portNumber,Protocol protocol){
+        if(!protocol.ports.containsKey(portNumber)){
+            Port p = new Port(portNumber);
+            return p;
+        }else{
+            return protocol.ports.get(portNumber);
+        }
+    }
 
 
 
 }
 
-//Referd to github repo : https://gist.github.com/madan712/6651967
+//Referd from github repo : https://gist.github.com/madan712/6651967
 class IPRangeChecker {
     public static long ipToLong(InetAddress ip) {
         byte[] octets = ip.getAddress();
